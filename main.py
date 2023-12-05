@@ -1,10 +1,12 @@
 from data import get_eval_data, get_train_data, parse_input
 from flask import Flask, jsonify, request
+from flask_cors import CORS, cross_origin
 from os import scandir
 from simpletransformers.question_answering import QuestionAnsweringModel
 import torch
 
 app = Flask(__name__)
+CORS(app)
 
 OUTPUT_DIR = './AnimeGPT'
 BEST_MODEL_DIR = f"{OUTPUT_DIR}/outputs/best_model"
@@ -50,16 +52,21 @@ def has_trained_model ():
     return any(scandir(f"{OUTPUT_DIR}/outputs/best_model"))
 
 @app.route('/ask-question', methods = ['POST'])
+@cross_origin()
 def ask_question():
-    model = QuestionAnsweringModel("bert", BEST_MODEL_DIR, use_cuda = False)
+    try:
+        model = QuestionAnsweringModel("bert", BEST_MODEL_DIR, use_cuda = False)
 
-    data = request.get_json()
-    question = parse_input(data["question"])
-    answers, _ = model.predict(question, n_best_size = None)
+        data = request.get_json()
+        question = parse_input(data["question"])
+        answers, _ = model.predict(question, n_best_size = None)
 
-    return jsonify({
-        "answer": answers[0]["answer"][2]
-    })
+        response = { "answer": answers[0] }
+        return jsonify(response)
+
+    except Exception as e:
+        error_message = str(e)
+        return jsonify({ "error": error_message }), 500
 
 if __name__ == "__main__":
     if not has_trained_model():
